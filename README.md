@@ -2,6 +2,8 @@
 
 A multi-agent on-call assistant. An alarm fires; agents **triage** it, **investigate** with read-only tools (logs, metrics, recent changes), and **propose a fix** as a pull-request draft. A human must approve before anything happens.
 
+**Live demo:** https://d25rhmz3l004tj.cloudfront.net (sign in with Clerk; paste your own Groq key on the dashboard to run live LLM agents, otherwise the rule-based demo engine runs)
+
 > Incidents are **simulated** (30 scenarios with known root causes) so the agents can be scored. Fixes are proposals; the "PR" on approval is simulated.
 
 ## What it shows

@@ -59,7 +59,8 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <footer className="border-t border-slate-200 px-4 py-4 text-center text-xs text-muted">
         Simulated incidents. Fixes are proposals only and are never applied automatically. &copy; On-Call SRE Agent by Arash Omranpour &middot;{" "}
-        <a className="underline" href="mailto:arashomranpour@gmail.com">arashomranpour@gmail.com</a>
+        <a className="underline" href="mailto:arashomranpour@gmail.com">arashomranpour@gmail.com</a> &middot;{" "}
+        <a className="underline" href="https://github.com/Arashomranpour/oncall-sre-agent" target="_blank" rel="noreferrer">Source on GitHub</a>
       </footer>
       <ToastHost />
     </div>
