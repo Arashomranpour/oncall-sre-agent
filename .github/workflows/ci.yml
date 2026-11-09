@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --python 3.12 --extra dev
+      - run: uv run pytest -q
+      # Quality gate: fails the build when root-cause accuracy drops below 80%.
+      # Offline engine in CI (no API key); run with a Groq key locally for real LLM numbers.
+      - run: SRE_ENGINE=offline uv run python -m sre.evals --min-accuracy 0.8
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: NODE_ENV=production npm run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [1_data, 2_backend, 3_frontend, 4_cicd]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=terraform/${{ matrix.module }} init -backend=false
+      - run: terraform -chdir=terraform/${{ matrix.module }} validate
+      - run: terraform fmt -check -recursive terraform/${{ matrix.module }}

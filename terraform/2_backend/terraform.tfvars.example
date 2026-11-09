@@ -1,0 +1,5 @@
+aws_region     = "eu-west-1"
+llm_model      = "groq/openai/gpt-oss-120b"
+clerk_jwks_url = ""   # https://<instance>.clerk.accounts.dev/.well-known/jwks.json
+clerk_issuer   = ""   # https://<instance>.clerk.accounts.dev
+cors_origins   = "http://localhost:3000"

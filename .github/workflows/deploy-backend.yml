@@ -1,0 +1,30 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/sre/**", "backend/pyproject.toml", "backend/package_lambda.py"]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    if: vars.AWS_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run --python 3.12 python package_lambda.py
+        working-directory: backend
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: |
+          for fn in oncall-sre-api oncall-sre-worker; do
+            aws lambda update-function-code --function-name $fn --zip-file fileb://backend/oncall_sre_lambda.zip
+            aws lambda wait function-updated --function-name $fn
+          done

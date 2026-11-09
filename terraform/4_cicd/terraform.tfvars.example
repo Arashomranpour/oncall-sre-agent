@@ -1,0 +1,5 @@
+github_repository          = "Arashomranpour/oncall-sre-agent"
+github_owner_id            = ""   # gh api repos/Arashomranpour/oncall-sre-agent --jq .owner.id
+github_repository_id       = ""   # gh api repos/Arashomranpour/oncall-sre-agent --jq .id
+cloudfront_distribution_id = ""   # from 3_frontend
+create_oidc_provider       = true
