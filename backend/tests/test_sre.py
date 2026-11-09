@@ -74,8 +74,10 @@ def test_malicious_fixer_output_is_blocked():
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("SRE_DB", str(tmp_path / "t.db"))
     monkeypatch.setenv("SRE_ENGINE", "offline")
-    monkeypatch.delenv("CLERK_JWKS_URL", raising=False)
-    monkeypatch.delenv("SQS_QUEUE_URL", raising=False)
+    # set to "" (not delete): load_dotenv() will not override an existing variable, so a developer's
+    # local .env cannot switch tests into Clerk or cloud mode
+    for var in ("CLERK_JWKS_URL", "SQS_QUEUE_URL", "WORKER_FUNCTION", "JOBS_TABLE"):
+        monkeypatch.setenv(var, "")
     import sre.store as store
 
     store._STORE = None

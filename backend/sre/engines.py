@@ -11,6 +11,7 @@ import json
 import os
 import re
 import time
+from types import SimpleNamespace
 from typing import Callable
 
 from .scenarios import CATEGORY_IDS, CATEGORY_TITLES, revert_diff
@@ -137,6 +138,19 @@ SYSTEM_BASE = (
 CAT_LIST = "\n".join(f"- {c}: {CATEGORY_TITLES[c]}" for c in CATEGORY_IDS)
 
 
+class RateLimited(Exception):
+    pass
+
+
+def _ns(o):
+    """dict/list -> attribute-style objects, so the Groq path matches the LiteLLM message shape."""
+    if isinstance(o, dict):
+        return SimpleNamespace(**{k: _ns(v) for k, v in o.items()})
+    if isinstance(o, list):
+        return [_ns(x) for x in o]
+    return o
+
+
 class LiveEngine:
     def __init__(self, model: str, api_key: str | None = None):
         self.model = model
@@ -146,29 +160,57 @@ class LiveEngine:
         self.cost = 0.0
 
     def _chat(self, messages: list, tools: list | None = None):
-        import litellm  # lazy: only needed in live mode
-
         last = None
         for attempt in range(5):
             try:
-                kw = dict(model=self.model, messages=messages, temperature=0, max_tokens=1500)
-                if tools:
-                    kw["tools"] = tools
-                if self.api_key:
-                    kw["api_key"] = self.api_key
-                resp = litellm.completion(**kw)
-                u = getattr(resp, "usage", None)
-                if u:
-                    self.tokens += getattr(u, "total_tokens", 0) or 0
-                try:
-                    self.cost += litellm.completion_cost(completion_response=resp) or 0.0
-                except Exception:
-                    pass
-                return resp.choices[0].message
-            except litellm.RateLimitError as e:
+                if self.model.startswith("groq/"):
+                    return self._chat_groq(messages, tools)  # direct HTTPS: small, no LiteLLM needed (Lambda)
+                return self._chat_litellm(messages, tools)
+            except RateLimited as e:
                 last = e
                 time.sleep(2 ** attempt * 2)
         raise RuntimeError(f"LLM rate-limited: {last}")
+
+    def _chat_groq(self, messages: list, tools: list | None):
+        import httpx
+
+        key = self.api_key or os.getenv("GROQ_API_KEY")
+        body = {"model": self.model.split("/", 1)[1], "messages": messages, "temperature": 0, "max_tokens": 1500}
+        if tools:
+            body["tools"] = tools
+        r = httpx.post("https://api.groq.com/openai/v1/chat/completions", json=body,
+                       headers={"Authorization": f"Bearer {key}"}, timeout=60)
+        if r.status_code == 429:
+            raise RateLimited(r.text[:200])
+        if r.status_code >= 400:
+            raise RuntimeError(f"Groq HTTP {r.status_code}: {r.text[:500]}")  # never includes the key
+        data = r.json()
+        self.tokens += (data.get("usage") or {}).get("total_tokens", 0) or 0
+        msg = data["choices"][0]["message"]
+        msg.setdefault("content", None)  # Groq omits these keys on tool-call turns
+        msg.setdefault("tool_calls", None)
+        return _ns(msg)
+
+    def _chat_litellm(self, messages: list, tools: list | None):
+        import litellm  # lazy: only for non-Groq providers
+
+        kw = dict(model=self.model, messages=messages, temperature=0, max_tokens=1500)
+        if tools:
+            kw["tools"] = tools
+        if self.api_key:
+            kw["api_key"] = self.api_key
+        try:
+            resp = litellm.completion(**kw)
+        except litellm.RateLimitError as e:
+            raise RateLimited(str(e)) from e
+        u = getattr(resp, "usage", None)
+        if u:
+            self.tokens += getattr(u, "total_tokens", 0) or 0
+        try:
+            self.cost += litellm.completion_cost(completion_response=resp) or 0.0
+        except Exception:
+            pass
+        return resp.choices[0].message
 
     def triage(self, env: SREEnvironment, emit: Emit) -> dict:
         emit("triage", "tool_call", "get_logs(limit=8)")

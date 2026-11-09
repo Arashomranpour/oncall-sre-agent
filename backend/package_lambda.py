@@ -15,7 +15,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 BUILD = HERE / "build_lambda"
 OUT = HERE / "oncall_sre_lambda.zip"
-DEPS = ["fastapi>=0.115", "pydantic>=2.7", "pyjwt[crypto]>=2.8", "python-dotenv>=1.0", "mangum>=0.17"]
+DEPS = ["fastapi>=0.115", "pydantic>=2.7", "pyjwt[crypto]>=2.8", "python-dotenv>=1.0", "mangum>=0.17", "httpx>=0.27"]
 
 
 def main() -> None:
